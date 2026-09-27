@@ -33,7 +33,6 @@
             border-radius: 0 20px 20px 0; cursor: pointer; transition: background 0.2s;
         }
         .search-box button:hover { background: var(--accent-color); color: #000; }
-        .header-icons { display: flex; gap: 10px; }
         .icon-btn {
             background: none; border: none; color: #fff; font-size: 0.9rem; cursor: pointer;
             padding: 6px 10px; border-radius: 6px; display: flex; align-items: center; gap: 4px; border: 1px solid var(--border-color);
@@ -122,7 +121,7 @@
         input:checked + .slider { background-color: var(--accent-color); }
         input:checked + .slider:before { transform: translateX(24px); background-color: #080c14; }
 
-        .loader { text-align: center; padding: 40px; color: var(--secondary-text); }
+        .loader { text-align: center; padding: 40px; color: var(--secondary-text); font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -130,7 +129,7 @@
     <header id="app-header">
         <div class="logo" id="logo-home">🌃 Umatte</div>
         <div class="search-box">
-            <input type="text" id="search-input" placeholder="Search the grid...">
+            <input type="text" id="search-input" placeholder="Search curated feeds...">
             <button id="search-btn">Search</button>
         </div>
         <div class="header-icons">
@@ -139,16 +138,16 @@
     </header>
 
     <div class="nav-tabs" id="nav-tabs">
-        <button class="tab-btn active" data-tab="trending">Trending (The Mine)</button>
+        <button class="tab-btn active" data-tab="trending">Trending</button>
         <button class="tab-btn" data-tab="subscriptions">Subscriptions</button>
-        <button class="tab-btn" data-tab="discover">✨ Discover Goldmine</button>
+        <button class="tab-btn" data-tab="discover">✨ Discover</button>
         <button class="tab-btn" data-tab="playlists">Playlists</button>
     </div>
 
     <div class="container">
         <!-- Feed / Grid View -->
         <div id="feed-view">
-            <h2 id="feed-title" style="margin-bottom: 12px; font-size: 1.1rem; color: var(--accent-color);">Trending Feed (The Mine)</h2>
+            <h2 id="feed-title" style="margin-bottom: 12px; font-size: 1.1rem; color: var(--accent-color);">Trending Feed</h2>
             <div id="video-grid" class="video-grid"></div>
         </div>
 
@@ -230,7 +229,7 @@
     </div>
 
     <script>
-        // Bulletproof local dataset guaranteeing instant UI rendering
+        // Structured Catalog with strict pagination limits
         const CATALOG = [
             { id: "vid1", title: "Cyberpunk 2077 Night City Ambient Mix - Neon Dreams", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
             { id: "vid2", title: "Building an Autonomous AI Agent in 2026", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
@@ -290,13 +289,17 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        // Controlled rendering with strict slice bounds
         function renderGrid(items, container, append = false) {
             if (!append) container.innerHTML = '';
-            if (!items || items.length === 0) {
-                if (!append) container.innerHTML = '<div class="loader">No items found in this section.</div>';
+            const safeItems = (items || []).slice(0, 16); // Maximum 16 items per view batch to protect DOM performance
+            
+            if (safeItems.length === 0) {
+                if (!append) container.innerHTML = '<div class="loader">No items found in this feed.</div>';
                 return;
             }
-            items.forEach(item => {
+            
+            safeItems.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'video-card';
                 card.innerHTML = `
@@ -314,7 +317,7 @@
         }
 
         function loadTrending() {
-            feedTitle.innerText = "Trending Feed (The Mine)";
+            feedTitle.innerText = "Trending Feed";
             renderGrid(CATALOG, videoGrid);
         }
 
@@ -329,8 +332,7 @@
         }
 
         function loadDiscoverFeed() {
-            feedTitle.innerText = "✨ Discover Goldmine (Collaborations & New Creators)";
-            // Shows creators the user is NOT subscribed to
+            feedTitle.innerText = "✨ Discover Feed";
             const discoverVideos = CATALOG.filter(v => !userSubscriptions.includes(v.uploader));
             renderGrid(discoverVideos, videoGrid);
         }
@@ -354,6 +356,4 @@
                     videoGrid.appendChild(header);
                     renderGrid(vids, videoGrid, true);
                 }
-            });
-        }
 
