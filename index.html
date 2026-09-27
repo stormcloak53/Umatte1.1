@@ -1,332 +1,394 @@
-<script>
-    // Safe storage wrapper to prevent crashes if localStorage is blocked or disabled
-    const safeStorage = {
-        getItem(key, fallback) {
-            try {
-                const item = localStorage.getItem(key);
-                return item !== null ? JSON.parse(item) : fallback;
-            } catch (e) {
-                return fallback;
-            }
-        },
-        setItem(key, value) {
-            try {
-                localStorage.setItem(key, JSON.stringify(value));
-            } catch (e) {
-                // Fallback silently if storage is blocked
-            }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UMatte - Video Alternative</title>
+    <style>
+        :root {
+            --bg-color: #0f0f0f;
+            --surface-color: #212121;
+            --text-color: #ffffff;
+            --text-secondary: #aaa;
+            --accent-color: #3ea6ff;
+            --danger-color: #ff4e45;
         }
-    };
-
-    // Structured Catalog with strict pagination limits
-    const CATALOG = [
-        { id: "vid1", title: "Cyberpunk 2077 Night City Ambient Mix - Neon Dreams", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
-        { id: "vid2", title: "Building an Autonomous AI Agent in 2026", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
-        { id: "vid3", title: "Synthwave Radio - Chill Beats to Hack/Code To", uploader: "NeonStream", thumbnail: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
-        { id: "vid4", title: "Future Tech: Quantum Computing Breakthroughs Explained", uploader: "Sciencenode", thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" },
-        { id: "vid5", title: "Deep Dive into Sci-Fi UI/UX Architecture", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
-        { id: "vid6", title: "Retro-Futurism & The Aesthetics of 80s Terminals", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" }
-    ];
-
-    let appSettings = safeStorage.getItem('umatte_settings', { autoRotate: true, gesturesEnabled: true });
-    let userSubscriptions = safeStorage.getItem('umatte_subs', []);
-    let userPlaylists = safeStorage.getItem('umatte_playlists', {"Favorites": []});
-    let currentVideoData = null;
-    let activeTab = 'trending';
-
-    function saveUserData() {
-        safeStorage.setItem('umatte_subs', userSubscriptions);
-        safeStorage.setItem('umatte_playlists', userPlaylists);
-        safeStorage.setItem('umatte_settings', appSettings);
-    }
-
-    function loadSettings() {
-        document.getElementById('setting-autorotate').checked = appSettings.autoRotate;
-        document.getElementById('setting-gestures').checked = appSettings.gesturesEnabled;
-    }
-
-    const feedView = document.getElementById('feed-view');
-    const playerView = document.getElementById('player-view');
-    const settingsView = document.getElementById('settings-view');
-    const videoGrid = document.getElementById('video-grid');
-    const recommendationsGrid = document.getElementById('recommendations-grid');
-    const mainVideo = document.getElementById('main-video');
-    const playerWrapper = document.getElementById('player-wrapper');
-    const watchTitle = document.getElementById('watch-title');
-    const watchChannel = document.getElementById('watch-channel');
-    const searchInput = document.getElementById('search-input');
-    const searchBtn = document.getElementById('search-btn');
-    const backToFeedBtn = document.getElementById('back-to-feed');
-    const verticalToggleBtn = document.getElementById('vertical-toggle-btn');
-    const subscribeBtn = document.getElementById('subscribe-btn');
-    const addPlaylistBtn = document.getElementById('add-playlist-btn');
-    const hudDisplay = document.getElementById('hud-display');
-    const feedTitle = document.getElementById('feed-title');
-    const settingsOpenBtn = document.getElementById('settings-open-btn');
-    const settingsBackBtn = document.getElementById('settings-back-btn');
-    const logoHome = document.getElementById('logo-home');
-    const navTabs = document.querySelectorAll('.tab-btn');
-
-    let isVerticalMode = false;
-
-    function switchView(viewName) {
-        feedView.style.display = viewName === 'feed' ? 'block' : 'none';
-        playerView.style.display = viewName === 'player' ? 'block' : 'none';
-        settingsView.style.display = viewName === 'settings' ? 'block' : 'none';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    function renderGrid(items, container, append = false) {
-        if (!append) container.innerHTML = '';
-        const safeItems = (items || []).slice(0, 16);
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Roboto, Arial, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding-bottom: 60px; }
         
-        if (safeItems.length === 0) {
-            if (!append) container.innerHTML = '<div class="loader">No items found in this feed.</div>';
-            return;
-        }
-        
-        safeItems.forEach(item => {
-            const card = document.createElement('div');
-            card.className = 'video-card';
-            card.innerHTML = \`
-                <div class="thumbnail-container">
-                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy">
-                </div>
-                <div class="video-info">
-                    <div class="video-title">${item.title}</div>
-                    <div class="video-channel">${item.uploader}</div>
-                </div>
-            \`;
-            card.addEventListener('click', () => playVideo(item));
-            container.appendChild(card);
-        });
-    }
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: var(--surface-color); position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 20px; font-weight: bold; cursor: pointer; color: var(--accent-color); }
+        .search-box { display: flex; gap: 8px; }
+        input[type="text"] { padding: 8px 12px; border-radius: 20px; border: 1px solid #444; background: #121212; color: #fff; width: 250px; }
+        button { padding: 8px 16px; border-radius: 20px; border: none; background: #333; color: #fff; cursor: pointer; }
+        button:hover { background: #444; }
 
-    function loadTrending() {
-        feedTitle.innerText = "Trending Feed";
-        renderGrid(CATALOG, videoGrid);
-    }
+        /* Navigation Tabs */
+        .nav-tabs { display: flex; gap: 10px; padding: 12px 20px; background: #181818; overflow-x: auto; }
+        .tab-btn { background: #272727; border-radius: 8px; padding: 6px 14px; font-size: 14px; white-space: nowrap; }
+        .tab-btn.active { background: var(--text-color); color: var(--bg-color); font-weight: bold; }
 
-    function loadSubscriptions() {
-        feedTitle.innerText = "Your Subscriptions Feed";
-        if (userSubscriptions.length === 0) {
-            videoGrid.innerHTML = '<div class="loader">No subscriptions saved yet. Open a video and hit Subscribe!</div>';
-            return;
-        }
-        const subVideos = CATALOG.filter(v => userSubscriptions.includes(v.uploader));
-        renderGrid(subVideos, videoGrid);
-    }
+        /* Views */
+        .view { padding: 20px; }
+        .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .video-card { background: var(--surface-color); border-radius: 12px; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
+        .video-card:hover { transform: scale(1.02); }
+        .thumbnail-container img { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+        .video-info { padding: 12px; }
+        .video-title { font-size: 15px; font-weight: 500; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .video-channel { font-size: 13px; color: var(--text-secondary); }
 
-    function loadDiscoverFeed() {
-        feedTitle.innerText = "✨ Discover Feed";
-        const discoverVideos = CATALOG.filter(v => !userSubscriptions.includes(v.uploader));
-        renderGrid(discoverVideos, videoGrid);
-    }
+        /* Player View */
+        #player-view { display: none; }
+        .player-wrapper { position: relative; width: 100%; max-width: 900px; margin: 0 auto; background: #000; border-radius: 12px; overflow: hidden; }
+        .player-wrapper video { width: 100%; display: block; aspect-ratio: 16/9; }
+        .player-wrapper.vertical-mode video { aspect-ratio: 9/16; max-height: 70vh; margin: 0 auto; }
+        .player-actions { display: flex; gap: 10px; margin-top: 15px; align-items: center; flex-wrap: wrap; }
+        .hud-display { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 18px; pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 10; }
+        .hud-display.show { opacity: 1; }
 
-    function loadPlaylistsView() {
-        feedTitle.innerText = "Your Saved Playlists";
-        videoGrid.innerHTML = '';
-        const playlistNames = Object.keys(userPlaylists);
-        if (playlistNames.length === 0 || playlistNames.every(p => userPlaylists[p].length === 0)) {
-            videoGrid.innerHTML = '<div class="loader">No saved videos in playlists yet.</div>';
-            return;
-        }
-        playlistNames.forEach(name => {
-            const vids = userPlaylists[name];
-            if (vids && vids.length > 0) {
-                const header = document.createElement('h3');
-                header.style.gridColumn = "1 / -1";
-                header.style.marginTop = "10px";
-                header.style.color = "var(--accent-color)";
-                header.innerText = \`📂 ${name} (${vids.length} videos)\`;
-                videoGrid.appendChild(header);
-                renderGrid(vids, videoGrid, true);
+        /* Settings View */
+        #settings-view { display: none; }
+        .settings-card { background: var(--surface-color); padding: 20px; border-radius: 12px; max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; gap: 15px; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; }
+
+        .loader { text-align: center; color: var(--text-secondary); grid-column: 1 / -1; padding: 40px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo" id="logo-home">▶ UMatte</div>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search videos...">
+            <button id="search-btn">Search</button>
+            <button id="settings-open-btn">⚙️</button>
+        </div>
+    </header>
+
+    <div class="nav-tabs" id="nav-tabs-container">
+        <button class="tab-btn active" data-tab="trending">Trending</button>
+        <button class="tab-btn" data-tab="subscriptions">Subscriptions</button>
+        <button class="tab-btn" data-tab="discover">Discover</button>
+        <button class="tab-btn" data-tab="playlists">Playlists</button>
+    </div>
+
+    <!-- Feed View -->
+    <div id="feed-view" class="view">
+        <h2 id="feed-title" style="margin-bottom: 20px;">Trending Feed</h2>
+        <div class="video-grid" id="video-grid"></div>
+    </div>
+
+    <!-- Player View -->
+    <div id="player-view" class="view">
+        <button id="back-to-feed" style="margin-bottom: 15px;">← Back to Feed</button>
+        <div class="player-wrapper" id="player-wrapper">
+            <video id="main-video" controls playsinline></video>
+            <div class="hud-display" id="hud-display"></div>
+        </div>
+        <div style="max-width: 900px; margin: 15px auto 0 auto;">
+            <h2 id="watch-title"></h2>
+            <p id="watch-channel" style="color: var(--text-secondary); margin-top: 5px;"></p>
+            <div class="player-actions">
+                <button id="subscribe-btn">⭐ Subscribe</button>
+                <button id="add-playlist-btn">📁 Add to Playlist</button>
+                <button id="vertical-toggle-btn">📱 Vertical Mode Toggle</button>
+            </div>
+        </div>
+        <hr style="border: 0; border-top: 1px solid #333; margin: 30px 0 20px 0;">
+        <h3 style="max-width: 900px; margin: 0 auto 15px auto;">Recommended</h3>
+        <div class="video-grid" id="recommendations-grid" style="max-width: 900px; margin: 0 auto;"></div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="settings-view" class="view">
+        <button id="settings-back-btn" style="margin-bottom: 15px;">← Back</button>
+        <div class="settings-card">
+            <h3>App Settings</h3>
+            <div class="setting-row">
+                <label for="setting-autorotate">Auto-Rotate on Play</label>
+                <input type="checkbox" id="setting-autorotate">
+            </div>
+            <div class="setting-row">
+                <label for="setting-gestures">Enable Touch Gestures (Volume/Seek)</label>
+                <input type="checkbox" id="setting-gestures">
+            </div>
+            <button id="export-data-btn">Export Subscriptions/Playlists (JSON)</button>
+        </div>
+    </div>
+
+    <script>
+        const safeStorage = {
+            getItem(key, fallback) {
+                try {
+                    const item = localStorage.getItem(key);
+                    return item !== null ? JSON.parse(item) : fallback;
+                } catch (e) {
+                    return fallback;
+                }
+            },
+            setItem(key, value) {
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                } catch (e) {}
             }
-        });
-    }
+        };
 
-    function performSearch(query) {
-        if (!query.trim()) return;
-        switchView('feed');
-        feedTitle.innerText = \`Search Results for "${query}"\`;
-        const results = CATALOG.filter(v => v.title.toLowerCase().includes(query.toLowerCase()) || v.uploader.toLowerCase().includes(query.toLowerCase()));
-        renderGrid(results, videoGrid);
-    }
+        const CATALOG = [
+            { id: "vid1", title: "Cyberpunk 2077 Night City Ambient Mix - Neon Dreams", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
+            { id: "vid2", title: "Building an Autonomous AI Agent in 2026", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
+            { id: "vid3", title: "Synthwave Radio - Chill Beats to Hack/Code To", uploader: "NeonStream", thumbnail: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
+            { id: "vid4", title: "Future Tech: Quantum Computing Breakthroughs Explained", uploader: "Sciencenode", thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" },
+            { id: "vid5", title: "Deep Dive into Sci-Fi UI/UX Architecture", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
+            { id: "vid6", title: "Retro-Futurism & The Aesthetics of 80s Terminals", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" }
+        ];
 
-    function playVideo(item) {
-        switchView('player');
-        currentVideoData = item;
-        watchTitle.innerText = item.title;
-        watchChannel.innerText = item.uploader;
+        let appSettings = safeStorage.getItem('umatte_settings', { autoRotate: true, gesturesEnabled: true });
+        let userSubscriptions = safeStorage.getItem('umatte_subs', []);
+        let userPlaylists = safeStorage.getItem('umatte_playlists', {"Favorites": []});
+        let currentVideoData = null;
+        let activeTab = 'trending';
 
-        const isSubbed = userSubscriptions.includes(item.uploader);
-        subscribeBtn.innerText = isSubbed ? "✓ Subscribed" : "⭐ Subscribe";
-
-        mainVideo.src = item.videoUrl;
-        mainVideo.load();
-
-        const recs = CATALOG.filter(v => v.id !== item.id);
-        renderGrid(recs, recommendationsGrid);
-    }
-
-    subscribeBtn.addEventListener('click', () => {
-        if (!currentVideoData) return;
-        const uploader = currentVideoData.uploader;
-        const index = userSubscriptions.indexOf(uploader);
-        if (index > -1) {
-            userSubscriptions.splice(index, 1);
-            subscribeBtn.innerText = "⭐ Subscribe";
-        } else {
-            userSubscriptions.push(uploader);
-            subscribeBtn.innerText = "✓ Subscribed";
+        function saveUserData() {
+            safeStorage.setItem('umatte_subs', userSubscriptions);
+            safeStorage.setItem('umatte_playlists', userPlaylists);
+            safeStorage.setItem('umatte_settings', appSettings);
         }
-        saveUserData();
-    });
 
-    addPlaylistBtn.addEventListener('click', () => {
-        if (!currentVideoData) return;
-        const playlistName = prompt("Enter playlist name:", "Favorites");
-        if (!playlistName) return;
-
-        if (!userPlaylists[playlistName]) userPlaylists[playlistName] = [];
-        
-        if (!userPlaylists[playlistName].some(v => v.id === currentVideoData.id)) {
-            userPlaylists[playlistName].push(currentVideoData);
-            saveUserData();
-            alert(\`Added to playlist "${playlistName}"!\`);
-        } else {
-            alert("Video is already in this playlist.");
+        function loadSettings() {
+            document.getElementById('setting-autorotate').checked = appSettings.autoRotate;
+            document.getElementById('setting-gestures').checked = appSettings.gesturesEnabled;
         }
-    });
 
-    mainVideo.addEventListener('play', () => {
-        if (appSettings.autoRotate && !isVerticalMode) {
-            if (screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('landscape').catch(() => {});
+        const feedView = document.getElementById('feed-view');
+        const playerView = document.getElementById('player-view');
+        const settingsView = document.getElementById('settings-view');
+        const videoGrid = document.getElementById('video-grid');
+        const recommendationsGrid = document.getElementById('recommendations-grid');
+        const mainVideo = document.getElementById('main-video');
+        const playerWrapper = document.getElementById('player-wrapper');
+        const watchTitle = document.getElementById('watch-title');
+        const watchChannel = document.getElementById('watch-channel');
+        const searchInput = document.getElementById('search-input');
+        const searchBtn = document.getElementById('search-btn');
+        const backToFeedBtn = document.getElementById('back-to-feed');
+        const verticalToggleBtn = document.getElementById('vertical-toggle-btn');
+        const subscribeBtn = document.getElementById('subscribe-btn');
+        const addPlaylistBtn = document.getElementById('add-playlist-btn');
+        const hudDisplay = document.getElementById('hud-display');
+        const feedTitle = document.getElementById('feed-title');
+        const settingsOpenBtn = document.getElementById('settings-open-btn');
+        const settingsBackBtn = document.getElementById('settings-back-btn');
+        const logoHome = document.getElementById('logo-home');
+        const navTabs = document.querySelectorAll('.tab-btn');
+
+        let isVerticalMode = false;
+
+        function switchView(viewName) {
+            feedView.style.display = viewName === 'feed' ? 'block' : 'none';
+            playerView.style.display = viewName === 'player' ? 'block' : 'none';
+            settingsView.style.display = viewName === 'settings' ? 'block' : 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderGrid(items, container, append = false) {
+            if (!append) container.innerHTML = '';
+            const safeItems = (items || []).slice(0, 16);
+            
+            if (safeItems.length === 0) {
+                if (!append) container.innerHTML = '<div class="loader">No items found in this feed.</div>';
+                return;
             }
+            
+            safeItems.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.innerHTML = `
+                    <div class="thumbnail-container">
+                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy">
+                    </div>
+                    <div class="video-info">
+                        <div class="video-title">${item.title}</div>
+                        <div class="video-channel">${item.uploader}</div>
+                    </div>
+                `;
+                card.addEventListener('click', () => playVideo(item));
+                container.appendChild(card);
+            });
         }
-    });
 
-    verticalToggleBtn.addEventListener('click', () => {
-        isVerticalMode = !isVerticalMode;
-        if (isVerticalMode) {
-            playerWrapper.classList.add('vertical-mode');
-            verticalToggleBtn.classList.add('active');
-            verticalToggleBtn.innerText = "🖥️ Landscape Mode Toggle";
-            if (screen.orientation && screen.orientation.unlock) { screen.orientation.unlock(); }
-        } else {
-            playerWrapper.classList.remove('vertical-mode');
-            verticalToggleBtn.classList.remove('active');
-            verticalToggleBtn.innerText = "📱 Vertical Mode Toggle";
-            if (appSettings.autoRotate && screen.orientation && screen.orientation.lock) {
-                screen.orientation.lock('landscape').catch(() => {});
+        function loadTrending() {
+            feedTitle.innerText = "Trending Feed";
+            renderGrid(CATALOG, videoGrid);
+        }
+
+        function loadSubscriptions() {
+            feedTitle.innerText = "Your Subscriptions Feed";
+            if (userSubscriptions.length === 0) {
+                videoGrid.innerHTML = '<div class="loader">No subscriptions saved yet. Open a video and hit Subscribe!</div>';
+                return;
             }
+            const subVideos = CATALOG.filter(v => userSubscriptions.includes(v.uploader));
+            renderGrid(subVideos, videoGrid);
         }
-    });
 
-    let touchStartY = 0;
-    let startVolume = 1;
-    let hudTimeout;
-
-    function showHUD(text) {
-        hudDisplay.innerText = text;
-        hudDisplay.classList.add('show');
-        clearTimeout(hudTimeout);
-        hudTimeout = setTimeout(() => { hudDisplay.classList.remove('show'); }, 800);
-    }
-
-    playerWrapper.addEventListener('touchstart', (e) => {
-        if (!appSettings.gesturesEnabled) return;
-        if (e.touches.length === 1) {
-            touchStartY = e.touches[0].clientY;
-            startVolume = mainVideo.volume;
+        function loadDiscoverFeed() {
+            feedTitle.innerText = "✨ Discover Feed";
+            const discoverVideos = CATALOG.filter(v => !userSubscriptions.includes(v.uploader));
+            renderGrid(discoverVideos, videoGrid);
         }
-    }, {passive: true});
 
-    playerWrapper.addEventListener('touchmove', (e) => {
-        if (!appSettings.gesturesEnabled) return;
-        if (e.touches.length === 1) {
-            const touchY = e.touches[0].clientY;
-            const touchX = e.touches[0].clientX;
-            const diffY = touchStartY - touchY;
-            const rect = playerWrapper.getBoundingClientRect();
-            if (touchX > rect.width / 2) {
-                let newVol = startVolume + (diffY / rect.height);
-                newVol = Math.max(0, Math.min(1, newVol));
-                mainVideo.volume = newVol;
-                showHUD(\`Volume: ${Math.round(newVol * 100)}%\`);
+        function loadPlaylistsView() {
+            feedTitle.innerText = "Your Saved Playlists";
+            videoGrid.innerHTML = '';
+            const playlistNames = Object.keys(userPlaylists);
+            if (playlistNames.length === 0 || playlistNames.every(p => userPlaylists[p].length === 0)) {
+                videoGrid.innerHTML = '<div class="loader">No saved videos in playlists yet.</div>';
+                return;
             }
+            playlistNames.forEach(name => {
+                const vids = userPlaylists[name];
+                if (vids && vids.length > 0) {
+                    const header = document.createElement('h3');
+                    header.style.gridColumn = "1 / -1";
+                    header.style.marginTop = "10px";
+                    header.style.color = "var(--accent-color)";
+                    header.innerText = `📂 ${name} (${vids.length} videos)`;
+                    videoGrid.appendChild(header);
+                    renderGrid(vids, videoGrid, true);
+                }
+            });
         }
-    }, {passive: true});
 
-    let lastTapTime = 0;
-    playerWrapper.addEventListener('click', (e) => {
-        if (!appSettings.gesturesEnabled) return;
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTapTime;
-        const rect = playerWrapper.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        if (tapLength < 300 && tapLength > 0) {
-            if (clickX > rect.width / 2) {
-                mainVideo.currentTime = Math.min(mainVideo.duration, mainVideo.currentTime + 10);
-                showHUD("+10s");
-            } else {
-                mainVideo.currentTime = Math.max(0, mainVideo.currentTime - 10);
-                showHUD("-10s");
-            }
-        }
-        lastTapTime = currentTime;
-    });
-
-    navTabs.forEach(btn => {
-        btn.addEventListener('click', () => {
-            navTabs.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            activeTab = btn.getAttribute('data-tab');
+        function performSearch(query) {
+            if (!query.trim()) return;
             switchView('feed');
-            if (activeTab === 'trending') loadTrending();
-            else if (activeTab === 'subscriptions') loadSubscriptions();
-            else if (activeTab === 'discover') loadDiscoverFeed();
-            else if (activeTab === 'playlists') loadPlaylistsView();
+            feedTitle.innerText = `Search Results for "${query}"`;
+            const results = CATALOG.filter(v => v.title.toLowerCase().includes(query.toLowerCase()) || v.uploader.toLowerCase().includes(query.toLowerCase()));
+            renderGrid(results, videoGrid);
+        }
+
+        function playVideo(item) {
+            switchView('player');
+            currentVideoData = item;
+            watchTitle.innerText = item.title;
+            watchChannel.innerText = item.uploader;
+
+            const isSubbed = userSubscriptions.includes(item.uploader);
+            subscribeBtn.innerText = isSubbed ? "✓ Subscribed" : "⭐ Subscribe";
+
+            mainVideo.src = item.videoUrl;
+            mainVideo.load();
+
+            const recs = CATALOG.filter(v => v.id !== item.id);
+            renderGrid(recs, recommendationsGrid);
+        }
+
+        subscribeBtn.addEventListener('click', () => {
+            if (!currentVideoData) return;
+            const uploader = currentVideoData.uploader;
+            const index = userSubscriptions.indexOf(uploader);
+            if (index > -1) {
+                userSubscriptions.splice(index, 1);
+                subscribeBtn.innerText = "⭐ Subscribe";
+            } else {
+                userSubscriptions.push(uploader);
+                subscribeBtn.innerText = "✓ Subscribed";
+            }
+            saveUserData();
         });
-    });
 
-    logoHome.addEventListener('click', () => { 
-        navTabs.forEach(b => b.classList.remove('active'));
-        document.querySelector('[data-tab="trending"]').classList.add('active');
-        switchView('feed'); 
-        loadTrending(); 
-    });
+        addPlaylistBtn.addEventListener('click', () => {
+            if (!currentVideoData) return;
+            const playlistName = prompt("Enter playlist name:", "Favorites");
+            if (!playlistName) return;
 
-    backToFeedBtn.addEventListener('click', () => {
-        mainVideo.pause();
-        mainVideo.src = '';
-        switchView('feed');
-        if (screen.orientation && screen.orientation.unlock) { screen.orientation.unlock(); }
-    });
+            if (!userPlaylists[playlistName]) userPlaylists[playlistName] = [];
+            
+            if (!userPlaylists[playlistName].some(v => v.id === currentVideoData.id)) {
+                userPlaylists[playlistName].push(currentVideoData);
+                saveUserData();
+                alert(`Added to playlist "${playlistName}"!`);
+            } else {
+                alert("Video is already in this playlist.");
+            }
+        });
 
-    settingsOpenBtn.addEventListener('click', () => switchView('settings'));
-    settingsBackBtn.addEventListener('click', () => {
-        appSettings.autoRotate = document.getElementById('setting-autorotate').checked;
-        appSettings.gesturesEnabled = document.getElementById('setting-gestures').checked;
-        saveUserData();
-        switchView('feed');
-    });
+        mainVideo.addEventListener('play', () => {
+            if (appSettings.autoRotate && !isVerticalMode) {
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(() => {});
+                }
+            }
+        });
 
-    document.getElementById('export-data-btn').addEventListener('click', () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ subscriptions: userSubscriptions, playlists: userPlaylists }));
-        const downloadAnchor = document.createElement('a');
-        downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", "umatte_backup.json");
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
-    });
+        verticalToggleBtn.addEventListener('click', () => {
+            isVerticalMode = !isVerticalMode;
+            if (isVerticalMode) {
+                playerWrapper.classList.add('vertical-mode');
+                verticalToggleBtn.classList.add('active');
+                verticalToggleBtn.innerText = "🖥️ Landscape Mode Toggle";
+                if (screen.orientation && screen.orientation.unlock) { screen.orientation.unlock(); }
+            } else {
+                playerWrapper.classList.remove('vertical-mode');
+                verticalToggleBtn.classList.remove('active');
+                verticalToggleBtn.innerText = "📱 Vertical Mode Toggle";
+                if (appSettings.autoRotate && screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(() => {});
+                }
+            }
+        });
 
-    searchBtn.addEventListener('click', () => performSearch(searchInput.value));
-    searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(searchInput.value); });
+        let touchStartY = 0;
+        let startVolume = 1;
+        let hudTimeout;
 
-    // Initialize UI safely
-    loadSettings();
-    loadTrending();
-</script>
+        function showHUD(text) {
+            hudDisplay.innerText = text;
+            hudDisplay.classList.add('show');
+            clearTimeout(hudTimeout);
+            hudTimeout = setTimeout(() => { hudDisplay.classList.remove('show'); }, 800);
+        }
+
+        playerWrapper.addEventListener('touchstart', (e) => {
+            if (!appSettings.gesturesEnabled) return;
+            if (e.touches.length === 1) {
+                touchStartY = e.touches[0].clientY;
+                startVolume = mainVideo.volume;
+            }
+        }, {passive: true});
+
+        playerWrapper.addEventListener('touchmove', (e) => {
+            if (!appSettings.gesturesEnabled) return;
+            if (e.touches.length === 1) {
+                const touchY = e.touches[0].clientY;
+                const touchX = e.touches[0].clientX;
+                const diffY = touchStartY - touchY;
+                const rect = playerWrapper.getBoundingClientRect();
+                if (touchX > rect.width / 2) {
+                    let newVol = startVolume + (diffY / rect.height);
+                    newVol = Math.max(0, Math.min(1, newVol));
+                    mainVideo.volume = newVol;
+                    showHUD(`Volume: ${Math.round(newVol * 100)}%`);
+                }
+            }
+        }, {passive: true});
+
+        let lastTapTime = 0;
+        playerWrapper.addEventListener('click', (e) => {
+            if (!appSettings.gesturesEnabled) return;
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
+            const rect = playerWrapper.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            if (tapLength < 300 && tapLength > 0) {
+                if (clickX > rect.width / 2) {
+                    mainVideo.currentTime = Math.min(mainVideo.duration, mainVideo.currentTime + 10);
+                    showHUD("+10s");
+                } else {
+                    mainVideo.currentTime = Math.max(0, mainVideo.currentTime - 10);
+                    showHUD("-10s");
+                }
+            }
+            lastTapTim
