@@ -1,359 +1,332 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Umatte - Sci-Fi Night City Video Player</title>
-    <style>
-        :root {
-            --bg-color: #080c14;
-            --surface-color: #111827;
-            --text-color: #f8fafc;
-            --accent-color: #38bdf8;
-            --secondary-text: #94a3b8;
-            --border-color: #1e293b;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Roboto, Arial, sans-serif; }
-        body { background-color: var(--bg-color); color: var(--text-color); min-height: 100vh; padding-bottom: 40px; }
-        
-        header {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 12px 16px; background: var(--surface-color); position: sticky; top: 0; z-index: 100;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .logo { font-size: 1.2rem; font-weight: bold; color: var(--accent-color); display: flex; align-items: center; gap: 6px; cursor: pointer; text-shadow: 0 0 10px rgba(56, 189, 248, 0.4); }
-        .search-box { display: flex; flex: 1; max-width: 500px; margin: 0 16px; }
-        .search-box input {
-            width: 100%; padding: 8px 12px; background: #030712; border: 1px solid var(--border-color);
-            color: #fff; border-radius: 20px 0 0 20px; outline: none; font-size: 0.95rem;
-        }
-        .search-box input:focus { border-color: var(--accent-color); }
-        .search-box button {
-            padding: 0 16px; background: var(--border-color); border: 1px solid var(--border-color); color: #fff;
-            border-radius: 0 20px 20px 0; cursor: pointer; transition: background 0.2s;
-        }
-        .search-box button:hover { background: var(--accent-color); color: #000; }
-        .icon-btn {
-            background: none; border: none; color: #fff; font-size: 0.9rem; cursor: pointer;
-            padding: 6px 10px; border-radius: 6px; display: flex; align-items: center; gap: 4px; border: 1px solid var(--border-color);
-        }
-        .icon-btn:hover { background: rgba(56, 189, 248, 0.1); border-color: var(--accent-color); }
-        
-        /* Navigation Tabs */
-        .nav-tabs {
-            display: flex; gap: 8px; padding: 12px 16px; background: var(--surface-color);
-            border-bottom: 1px solid var(--border-color); overflow-x: auto;
-        }
-        .tab-btn {
-            background: #030712; border: 1px solid var(--border-color); color: var(--text-color);
-            padding: 6px 14px; border-radius: 16px; cursor: pointer; font-size: 0.85rem; white-space: nowrap;
-            transition: all 0.2s;
-        }
-        .tab-btn.active { background: var(--accent-color); color: #080c14; font-weight: bold; border-color: var(--accent-color); box-shadow: 0 0 12px rgba(56, 189, 248, 0.3); }
-
-        .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
-        
-        /* Grid Layout */
-        .video-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;
-        }
-        .video-card {
-            background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; cursor: pointer;
-            transition: transform 0.2s, border-color 0.2s; display: flex; flex-direction: column; position: relative;
-        }
-        .video-card:hover { transform: translateY(-2px); border-color: var(--accent-color); }
-        .thumbnail-container { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; }
-        .thumbnail-container img { width: 100%; height: 100%; object-fit: cover; }
-        .video-info { padding: 10px; display: flex; flex-direction: column; gap: 4px; }
-        .video-title { font-size: 0.95rem; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .video-channel { font-size: 0.8rem; color: var(--secondary-text); }
-        
-        /* Player View Styles */
-        #player-view { display: none; margin-top: 10px; }
-        .player-header-controls {
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;
-        }
-        .mode-btn {
-            background: #1e293b; color: #fff; border: 1px solid var(--border-color); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;
-            transition: background 0.2s;
-        }
-        .mode-btn:hover { border-color: var(--accent-color); }
-        .mode-btn.active { background: var(--accent-color); color: #080c14; font-weight: bold; border-color: var(--accent-color); }
-        
-        .video-player-wrapper {
-            position: relative; width: 100%; aspect-ratio: 16/9; background: #000;
-            border-radius: 12px; overflow: hidden; user-select: none; border: 1px solid var(--border-color);
-        }
-        .video-player-wrapper.vertical-mode {
-            aspect-ratio: 9/16; max-height: 80vh; margin: 0 auto;
-        }
-        video { width: 100%; height: 100%; object-fit: contain; }
-        
-        .hud-overlay {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(8, 12, 20, 0.85); border: 1px solid var(--accent-color); color: var(--accent-color); padding: 10px 18px; border-radius: 8px;
-            font-size: 1rem; pointer-events: none; opacity: 0; transition: opacity 0.2s;
-        }
-        .hud-overlay.show { opacity: 1; }
-        
-        .video-details { margin: 12px 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .video-meta h2 { font-size: 1.1rem; margin-bottom: 4px; }
-        .video-meta p { color: var(--secondary-text); font-size: 0.85rem; }
-        
-        .action-buttons { display: flex; gap: 8px; }
-
-        .recommendations-section { margin-top: 24px; }
-        .recommendations-section h3 { font-size: 1rem; margin-bottom: 12px; color: var(--accent-color); }
-
-        /* Settings View Styles */
-        #settings-view { display: none; margin-top: 10px; }
-        .settings-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-        .settings-section { background: var(--surface-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-        .settings-section h3 { font-size: 1rem; margin-bottom: 12px; color: var(--accent-color); border-bottom: 1px solid var(--border-color); padding-bottom: 6px; }
-        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; }
-        .setting-label { font-size: 0.95rem; }
-        .setting-desc { font-size: 0.8rem; color: var(--secondary-text); }
-        
-        .switch { position: relative; display: inline-block; width: 48px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #1e293b; transition: .3s; border-radius: 24px; border: 1px solid var(--border-color); }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--accent-color); }
-        input:checked + .slider:before { transform: translateX(24px); background-color: #080c14; }
-
-        .loader { text-align: center; padding: 40px; color: var(--secondary-text); font-size: 0.9rem; }
-    </style>
-</head>
-<body>
-
-    <header id="app-header">
-        <div class="logo" id="logo-home">🌃 Umatte</div>
-        <div class="search-box">
-            <input type="text" id="search-input" placeholder="Search curated feeds...">
-            <button id="search-btn">Search</button>
-        </div>
-        <div class="header-icons">
-            <button class="icon-btn" id="settings-open-btn" title="Settings">⚙️ Settings</button>
-        </div>
-    </header>
-
-    <div class="nav-tabs" id="nav-tabs">
-        <button class="tab-btn active" data-tab="trending">Trending</button>
-        <button class="tab-btn" data-tab="subscriptions">Subscriptions</button>
-        <button class="tab-btn" data-tab="discover">✨ Discover</button>
-        <button class="tab-btn" data-tab="playlists">Playlists</button>
-    </div>
-
-    <div class="container">
-        <!-- Feed / Grid View -->
-        <div id="feed-view">
-            <h2 id="feed-title" style="margin-bottom: 12px; font-size: 1.1rem; color: var(--accent-color);">Trending Feed</h2>
-            <div id="video-grid" class="video-grid"></div>
-        </div>
-
-        <!-- Watch / Player View -->
-        <div id="player-view">
-            <div class="player-header-controls">
-                <button class="mode-btn" id="back-to-feed">← Back</button>
-                <button class="mode-btn" id="vertical-toggle-btn">📱 Vertical Mode Toggle</button>
-            </div>
-            
-            <div class="video-player-wrapper" id="player-wrapper">
-                <video id="main-video" playsinline controls></video>
-                <div class="hud-overlay" id="hud-display">Volume: 100%</div>
-            </div>
-
-            <div class="video-details">
-                <div class="video-meta">
-                    <h2 id="watch-title">Video Title</h2>
-                    <p id="watch-channel">Channel Name</p>
-                </div>
-                <div class="action-buttons">
-                    <button class="mode-btn" id="subscribe-btn">⭐ Subscribe</button>
-                    <button class="mode-btn" id="add-playlist-btn">📂 Add to Playlist</button>
-                </div>
-            </div>
-
-            <div class="recommendations-section">
-                <h3>Recommended Videos</h3>
-                <div id="recommendations-grid" class="video-grid"></div>
-            </div>
-        </div>
-
-        <!-- Settings Page View -->
-        <div id="settings-view">
-            <div class="settings-header">
-                <h2 style="color: var(--accent-color);">Umatte Settings</h2>
-                <button class="mode-btn" id="settings-back-btn">← Back</button>
-            </div>
-
-            <div class="settings-section">
-                <h3>Playback & Rotation</h3>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label">Auto-Rotate on Play</div>
-                        <div class="setting-desc">Automatically lock to landscape orientation when playback starts</div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="setting-autorotate" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="settings-section">
-                <h3>Gesture Controls</h3>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label">Enable Gestures Engine</div>
-                        <div class="setting-desc">Swipe right for volume, double-tap left/right to skip backward/forward</div>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="setting-gestures" checked>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="settings-section">
-                <h3>Data Management</h3>
-                <div class="setting-item">
-                    <div>
-                        <div class="setting-label">Export / Backup Data</div>
-                        <div class="setting-desc">Download subscriptions and playlists as a JSON file</div>
-                    </div>
-                    <button class="mode-btn" id="export-data-btn">Export JSON</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // Structured Catalog with strict pagination limits
-        const CATALOG = [
-            { id: "vid1", title: "Cyberpunk 2077 Night City Ambient Mix - Neon Dreams", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
-            { id: "vid2", title: "Building an Autonomous AI Agent in 2026", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
-            { id: "vid3", title: "Synthwave Radio - Chill Beats to Hack/Code To", uploader: "NeonStream", thumbnail: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
-            { id: "vid4", title: "Future Tech: Quantum Computing Breakthroughs Explained", uploader: "Sciencenode", thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" },
-            { id: "vid5", title: "Deep Dive into Sci-Fi UI/UX Architecture", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
-            { id: "vid6", title: "Retro-Futurism & The Aesthetics of 80s Terminals", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" }
-        ];
-
-        let appSettings = { autoRotate: true, gesturesEnabled: true };
-        let userSubscriptions = JSON.parse(localStorage.getItem('umatte_subs') || '[]');
-        let userPlaylists = JSON.parse(localStorage.getItem('umatte_playlists') || '{"Favorites": []}');
-        let currentVideoData = null;
-        let activeTab = 'trending';
-
-        function saveUserData() {
-            localStorage.setItem('umatte_subs', JSON.stringify(userSubscriptions));
-            localStorage.setItem('umatte_playlists', JSON.stringify(userPlaylists));
-            localStorage.setItem('umatte_settings', JSON.stringify(appSettings));
-        }
-
-        function loadSettings() {
-            const saved = localStorage.getItem('umatte_settings');
-            if (saved) { try { appSettings = JSON.parse(saved); } catch(e){} }
-            document.getElementById('setting-autorotate').checked = appSettings.autoRotate;
-            document.getElementById('setting-gestures').checked = appSettings.gesturesEnabled;
-        }
-
-        const feedView = document.getElementById('feed-view');
-        const playerView = document.getElementById('player-view');
-        const settingsView = document.getElementById('settings-view');
-        const videoGrid = document.getElementById('video-grid');
-        const recommendationsGrid = document.getElementById('recommendations-grid');
-        const mainVideo = document.getElementById('main-video');
-        const playerWrapper = document.getElementById('player-wrapper');
-        const watchTitle = document.getElementById('watch-title');
-        const watchChannel = document.getElementById('watch-channel');
-        const searchInput = document.getElementById('search-input');
-        const searchBtn = document.getElementById('search-btn');
-        const backToFeedBtn = document.getElementById('back-to-feed');
-        const verticalToggleBtn = document.getElementById('vertical-toggle-btn');
-        const subscribeBtn = document.getElementById('subscribe-btn');
-        const addPlaylistBtn = document.getElementById('add-playlist-btn');
-        const hudDisplay = document.getElementById('hud-display');
-        const feedTitle = document.getElementById('feed-title');
-        const settingsOpenBtn = document.getElementById('settings-open-btn');
-        const settingsBackBtn = document.getElementById('settings-back-btn');
-        const logoHome = document.getElementById('logo-home');
-        const navTabs = document.querySelectorAll('.tab-btn');
-
-        let isVerticalMode = false;
-
-        function switchView(viewName) {
-            feedView.style.display = viewName === 'feed' ? 'block' : 'none';
-            playerView.style.display = viewName === 'player' ? 'block' : 'none';
-            settingsView.style.display = viewName === 'settings' ? 'block' : 'none';
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-
-        // Controlled rendering with strict slice bounds
-        function renderGrid(items, container, append = false) {
-            if (!append) container.innerHTML = '';
-            const safeItems = (items || []).slice(0, 16); // Maximum 16 items per view batch to protect DOM performance
-            
-            if (safeItems.length === 0) {
-                if (!append) container.innerHTML = '<div class="loader">No items found in this feed.</div>';
-                return;
+<script>
+    // Safe storage wrapper to prevent crashes if localStorage is blocked or disabled
+    const safeStorage = {
+        getItem(key, fallback) {
+            try {
+                const item = localStorage.getItem(key);
+                return item !== null ? JSON.parse(item) : fallback;
+            } catch (e) {
+                return fallback;
             }
-            
-            safeItems.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'video-card';
-                card.innerHTML = `
-                    <div class="thumbnail-container">
-                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy">
-                    </div>
-                    <div class="video-info">
-                        <div class="video-title">${item.title}</div>
-                        <div class="video-channel">${item.uploader}</div>
-                    </div>
-                `;
-                card.addEventListener('click', () => playVideo(item));
-                container.appendChild(card);
-            });
-        }
-
-        function loadTrending() {
-            feedTitle.innerText = "Trending Feed";
-            renderGrid(CATALOG, videoGrid);
-        }
-
-        function loadSubscriptions() {
-            feedTitle.innerText = "Your Subscriptions Feed";
-            if (userSubscriptions.length === 0) {
-                videoGrid.innerHTML = '<div class="loader">No subscriptions saved yet. Open a video and hit Subscribe!</div>';
-                return;
+        },
+        setItem(key, value) {
+            try {
+                localStorage.setItem(key, JSON.stringify(value));
+            } catch (e) {
+                // Fallback silently if storage is blocked
             }
-            const subVideos = CATALOG.filter(v => userSubscriptions.includes(v.uploader));
-            renderGrid(subVideos, videoGrid);
         }
+    };
 
-        function loadDiscoverFeed() {
-            feedTitle.innerText = "✨ Discover Feed";
-            const discoverVideos = CATALOG.filter(v => !userSubscriptions.includes(v.uploader));
-            renderGrid(discoverVideos, videoGrid);
+    // Structured Catalog with strict pagination limits
+    const CATALOG = [
+        { id: "vid1", title: "Cyberpunk 2077 Night City Ambient Mix - Neon Dreams", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
+        { id: "vid2", title: "Building an Autonomous AI Agent in 2026", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
+        { id: "vid3", title: "Synthwave Radio - Chill Beats to Hack/Code To", uploader: "NeonStream", thumbnail: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
+        { id: "vid4", title: "Future Tech: Quantum Computing Breakthroughs Explained", uploader: "Sciencenode", thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" },
+        { id: "vid5", title: "Deep Dive into Sci-Fi UI/UX Architecture", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
+        { id: "vid6", title: "Retro-Futurism & The Aesthetics of 80s Terminals", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" }
+    ];
+
+    let appSettings = safeStorage.getItem('umatte_settings', { autoRotate: true, gesturesEnabled: true });
+    let userSubscriptions = safeStorage.getItem('umatte_subs', []);
+    let userPlaylists = safeStorage.getItem('umatte_playlists', {"Favorites": []});
+    let currentVideoData = null;
+    let activeTab = 'trending';
+
+    function saveUserData() {
+        safeStorage.setItem('umatte_subs', userSubscriptions);
+        safeStorage.setItem('umatte_playlists', userPlaylists);
+        safeStorage.setItem('umatte_settings', appSettings);
+    }
+
+    function loadSettings() {
+        document.getElementById('setting-autorotate').checked = appSettings.autoRotate;
+        document.getElementById('setting-gestures').checked = appSettings.gesturesEnabled;
+    }
+
+    const feedView = document.getElementById('feed-view');
+    const playerView = document.getElementById('player-view');
+    const settingsView = document.getElementById('settings-view');
+    const videoGrid = document.getElementById('video-grid');
+    const recommendationsGrid = document.getElementById('recommendations-grid');
+    const mainVideo = document.getElementById('main-video');
+    const playerWrapper = document.getElementById('player-wrapper');
+    const watchTitle = document.getElementById('watch-title');
+    const watchChannel = document.getElementById('watch-channel');
+    const searchInput = document.getElementById('search-input');
+    const searchBtn = document.getElementById('search-btn');
+    const backToFeedBtn = document.getElementById('back-to-feed');
+    const verticalToggleBtn = document.getElementById('vertical-toggle-btn');
+    const subscribeBtn = document.getElementById('subscribe-btn');
+    const addPlaylistBtn = document.getElementById('add-playlist-btn');
+    const hudDisplay = document.getElementById('hud-display');
+    const feedTitle = document.getElementById('feed-title');
+    const settingsOpenBtn = document.getElementById('settings-open-btn');
+    const settingsBackBtn = document.getElementById('settings-back-btn');
+    const logoHome = document.getElementById('logo-home');
+    const navTabs = document.querySelectorAll('.tab-btn');
+
+    let isVerticalMode = false;
+
+    function switchView(viewName) {
+        feedView.style.display = viewName === 'feed' ? 'block' : 'none';
+        playerView.style.display = viewName === 'player' ? 'block' : 'none';
+        settingsView.style.display = viewName === 'settings' ? 'block' : 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function renderGrid(items, container, append = false) {
+        if (!append) container.innerHTML = '';
+        const safeItems = (items || []).slice(0, 16);
+        
+        if (safeItems.length === 0) {
+            if (!append) container.innerHTML = '<div class="loader">No items found in this feed.</div>';
+            return;
         }
+        
+        safeItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'video-card';
+            card.innerHTML = \`
+                <div class="thumbnail-container">
+                    <img src="${item.thumbnail}" alt="${item.title}" loading="lazy">
+                </div>
+                <div class="video-info">
+                    <div class="video-title">${item.title}</div>
+                    <div class="video-channel">${item.uploader}</div>
+                </div>
+            \`;
+            card.addEventListener('click', () => playVideo(item));
+            container.appendChild(card);
+        });
+    }
 
-        function loadPlaylistsView() {
-            feedTitle.innerText = "Your Saved Playlists";
-            videoGrid.innerHTML = '';
-            const playlistNames = Object.keys(userPlaylists);
-            if (playlistNames.length === 0 || playlistNames.every(p => userPlaylists[p].length === 0)) {
-                videoGrid.innerHTML = '<div class="loader">No saved videos in playlists yet.</div>';
-                return;
+    function loadTrending() {
+        feedTitle.innerText = "Trending Feed";
+        renderGrid(CATALOG, videoGrid);
+    }
+
+    function loadSubscriptions() {
+        feedTitle.innerText = "Your Subscriptions Feed";
+        if (userSubscriptions.length === 0) {
+            videoGrid.innerHTML = '<div class="loader">No subscriptions saved yet. Open a video and hit Subscribe!</div>';
+            return;
+        }
+        const subVideos = CATALOG.filter(v => userSubscriptions.includes(v.uploader));
+        renderGrid(subVideos, videoGrid);
+    }
+
+    function loadDiscoverFeed() {
+        feedTitle.innerText = "✨ Discover Feed";
+        const discoverVideos = CATALOG.filter(v => !userSubscriptions.includes(v.uploader));
+        renderGrid(discoverVideos, videoGrid);
+    }
+
+    function loadPlaylistsView() {
+        feedTitle.innerText = "Your Saved Playlists";
+        videoGrid.innerHTML = '';
+        const playlistNames = Object.keys(userPlaylists);
+        if (playlistNames.length === 0 || playlistNames.every(p => userPlaylists[p].length === 0)) {
+            videoGrid.innerHTML = '<div class="loader">No saved videos in playlists yet.</div>';
+            return;
+        }
+        playlistNames.forEach(name => {
+            const vids = userPlaylists[name];
+            if (vids && vids.length > 0) {
+                const header = document.createElement('h3');
+                header.style.gridColumn = "1 / -1";
+                header.style.marginTop = "10px";
+                header.style.color = "var(--accent-color)";
+                header.innerText = \`📂 ${name} (${vids.length} videos)\`;
+                videoGrid.appendChild(header);
+                renderGrid(vids, videoGrid, true);
             }
-            playlistNames.forEach(name => {
-                const vids = userPlaylists[name];
-                if (vids.length > 0) {
-                    const header = document.createElement('h3');
-                    header.style.gridColumn = "1 / -1";
-                    header.style.marginTop = "10px";
-                    header.style.color = "var(--accent-color)";
-                    header.innerText = `📂 ${name} (${vids.length} videos)`;
-                    videoGrid.appendChild(header);
-                    renderGrid(vids, videoGrid, true);
-                }
+        });
+    }
 
+    function performSearch(query) {
+        if (!query.trim()) return;
+        switchView('feed');
+        feedTitle.innerText = \`Search Results for "${query}"\`;
+        const results = CATALOG.filter(v => v.title.toLowerCase().includes(query.toLowerCase()) || v.uploader.toLowerCase().includes(query.toLowerCase()));
+        renderGrid(results, videoGrid);
+    }
+
+    function playVideo(item) {
+        switchView('player');
+        currentVideoData = item;
+        watchTitle.innerText = item.title;
+        watchChannel.innerText = item.uploader;
+
+        const isSubbed = userSubscriptions.includes(item.uploader);
+        subscribeBtn.innerText = isSubbed ? "✓ Subscribed" : "⭐ Subscribe";
+
+        mainVideo.src = item.videoUrl;
+        mainVideo.load();
+
+        const recs = CATALOG.filter(v => v.id !== item.id);
+        renderGrid(recs, recommendationsGrid);
+    }
+
+    subscribeBtn.addEventListener('click', () => {
+        if (!currentVideoData) return;
+        const uploader = currentVideoData.uploader;
+        const index = userSubscriptions.indexOf(uploader);
+        if (index > -1) {
+            userSubscriptions.splice(index, 1);
+            subscribeBtn.innerText = "⭐ Subscribe";
+        } else {
+            userSubscriptions.push(uploader);
+            subscribeBtn.innerText = "✓ Subscribed";
+        }
+        saveUserData();
+    });
+
+    addPlaylistBtn.addEventListener('click', () => {
+        if (!currentVideoData) return;
+        const playlistName = prompt("Enter playlist name:", "Favorites");
+        if (!playlistName) return;
+
+        if (!userPlaylists[playlistName]) userPlaylists[playlistName] = [];
+        
+        if (!userPlaylists[playlistName].some(v => v.id === currentVideoData.id)) {
+            userPlaylists[playlistName].push(currentVideoData);
+            saveUserData();
+            alert(\`Added to playlist "${playlistName}"!\`);
+        } else {
+            alert("Video is already in this playlist.");
+        }
+    });
+
+    mainVideo.addEventListener('play', () => {
+        if (appSettings.autoRotate && !isVerticalMode) {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        }
+    });
+
+    verticalToggleBtn.addEventListener('click', () => {
+        isVerticalMode = !isVerticalMode;
+        if (isVerticalMode) {
+            playerWrapper.classList.add('vertical-mode');
+            verticalToggleBtn.classList.add('active');
+            verticalToggleBtn.innerText = "🖥️ Landscape Mode Toggle";
+            if (screen.orientation && screen.orientation.unlock) { screen.orientation.unlock(); }
+        } else {
+            playerWrapper.classList.remove('vertical-mode');
+            verticalToggleBtn.classList.remove('active');
+            verticalToggleBtn.innerText = "📱 Vertical Mode Toggle";
+            if (appSettings.autoRotate && screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        }
+    });
+
+    let touchStartY = 0;
+    let startVolume = 1;
+    let hudTimeout;
+
+    function showHUD(text) {
+        hudDisplay.innerText = text;
+        hudDisplay.classList.add('show');
+        clearTimeout(hudTimeout);
+        hudTimeout = setTimeout(() => { hudDisplay.classList.remove('show'); }, 800);
+    }
+
+    playerWrapper.addEventListener('touchstart', (e) => {
+        if (!appSettings.gesturesEnabled) return;
+        if (e.touches.length === 1) {
+            touchStartY = e.touches[0].clientY;
+            startVolume = mainVideo.volume;
+        }
+    }, {passive: true});
+
+    playerWrapper.addEventListener('touchmove', (e) => {
+        if (!appSettings.gesturesEnabled) return;
+        if (e.touches.length === 1) {
+            const touchY = e.touches[0].clientY;
+            const touchX = e.touches[0].clientX;
+            const diffY = touchStartY - touchY;
+            const rect = playerWrapper.getBoundingClientRect();
+            if (touchX > rect.width / 2) {
+                let newVol = startVolume + (diffY / rect.height);
+                newVol = Math.max(0, Math.min(1, newVol));
+                mainVideo.volume = newVol;
+                showHUD(\`Volume: ${Math.round(newVol * 100)}%\`);
+            }
+        }
+    }, {passive: true});
+
+    let lastTapTime = 0;
+    playerWrapper.addEventListener('click', (e) => {
+        if (!appSettings.gesturesEnabled) return;
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTapTime;
+        const rect = playerWrapper.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        if (tapLength < 300 && tapLength > 0) {
+            if (clickX > rect.width / 2) {
+                mainVideo.currentTime = Math.min(mainVideo.duration, mainVideo.currentTime + 10);
+                showHUD("+10s");
+            } else {
+                mainVideo.currentTime = Math.max(0, mainVideo.currentTime - 10);
+                showHUD("-10s");
+            }
+        }
+        lastTapTime = currentTime;
+    });
+
+    navTabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+            navTabs.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeTab = btn.getAttribute('data-tab');
+            switchView('feed');
+            if (activeTab === 'trending') loadTrending();
+            else if (activeTab === 'subscriptions') loadSubscriptions();
+            else if (activeTab === 'discover') loadDiscoverFeed();
+            else if (activeTab === 'playlists') loadPlaylistsView();
+        });
+    });
+
+    logoHome.addEventListener('click', () => { 
+        navTabs.forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-tab="trending"]').classList.add('active');
+        switchView('feed'); 
+        loadTrending(); 
+    });
+
+    backToFeedBtn.addEventListener('click', () => {
+        mainVideo.pause();
+        mainVideo.src = '';
+        switchView('feed');
+        if (screen.orientation && screen.orientation.unlock) { screen.orientation.unlock(); }
+    });
+
+    settingsOpenBtn.addEventListener('click', () => switchView('settings'));
+    settingsBackBtn.addEventListener('click', () => {
+        appSettings.autoRotate = document.getElementById('setting-autorotate').checked;
+        appSettings.gesturesEnabled = document.getElementById('setting-gestures').checked;
+        saveUserData();
+        switchView('feed');
+    });
+
+    document.getElementById('export-data-btn').addEventListener('click', () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ subscriptions: userSubscriptions, playlists: userPlaylists }));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", "umatte_backup.json");
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    });
+
+    searchBtn.addEventListener('click', () => performSearch(searchInput.value));
+    searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') performSearch(searchInput.value); });
+
+    // Initialize UI safely
+    loadSettings();
+    loadTrending();
+</script>
