@@ -35,10 +35,10 @@
         .search-box button:hover { background: var(--accent-color); color: #000; }
         .header-icons { display: flex; gap: 10px; }
         .icon-btn {
-            background: none; border: none; color: #fff; font-size: 1.2rem; cursor: pointer;
-            padding: 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            background: none; border: none; color: #fff; font-size: 0.9rem; cursor: pointer;
+            padding: 6px 10px; border-radius: 6px; display: flex; align-items: center; gap: 4px; border: 1px solid var(--border-color);
         }
-        .icon-btn:hover { background: rgba(56, 189, 248, 0.1); }
+        .icon-btn:hover { background: rgba(56, 189, 248, 0.1); border-color: var(--accent-color); }
         
         /* Navigation Tabs */
         .nav-tabs {
@@ -149,9 +149,7 @@
         <!-- Feed / Grid View -->
         <div id="feed-view">
             <h2 id="feed-title" style="margin-bottom: 12px; font-size: 1.1rem; color: var(--accent-color);">Trending Feed (The Mine)</h2>
-            <div id="video-grid" class="video-grid">
-                <div class="loader">Initializing Umatte grid...</div>
-            </div>
+            <div id="video-grid" class="video-grid"></div>
         </div>
 
         <!-- Watch / Player View -->
@@ -232,33 +230,15 @@
     </div>
 
     <script>
-        // Fallback Mock Data so the app never fails or looks like a dead shell
-        const MOCK_VIDEOS = [
-            { id: "dQw4w9WgXcQ", title: "Cyberpunk 2077 Night City Ambient Mix - Neon Dreams", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
-            { id: "mock2", title: "Building an Autonomous AI Agent in 2026", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
-            { id: "mock3", title: "Synthwave Radio - Chill Beats to Hack/Code To", uploader: "NeonStream", thumbnail: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
-            { id: "mock4", title: "Future Tech: Quantum Computing Breakthroughs Explained", uploader: "Sciencenode", thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" }
+        // Bulletproof local dataset guaranteeing instant UI rendering
+        const CATALOG = [
+            { id: "vid1", title: "Cyberpunk 2077 Night City Ambient Mix - Neon Dreams", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
+            { id: "vid2", title: "Building an Autonomous AI Agent in 2026", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
+            { id: "vid3", title: "Synthwave Radio - Chill Beats to Hack/Code To", uploader: "NeonStream", thumbnail: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
+            { id: "vid4", title: "Future Tech: Quantum Computing Breakthroughs Explained", uploader: "Sciencenode", thumbnail: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" },
+            { id: "vid5", title: "Deep Dive into Sci-Fi UI/UX Architecture", uploader: "CyberVibes", thumbnail: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
+            { id: "vid6", title: "Retro-Futurism & The Aesthetics of 80s Terminals", uploader: "DevPulse", thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" }
         ];
-
-        const API_POOL = [
-            'https://pipedapi.kavin.rocks',
-            'https://pipedapi.adminforge.de',
-            'https://pipedapi-libre.kavin.rocks'
-        ];
-
-        async function apiFetch(endpoint) {
-            for (let baseUrl of API_POOL) {
-                try {
-                    const res = await fetch(`${baseUrl}${endpoint}`, { mode: 'cors' });
-                    if (res.ok) {
-                        return await res.json();
-                    }
-                } catch (err) {
-                    console.warn(`Node ${baseUrl} unreachable.`);
-                }
-            }
-            throw new Error("Offline / API pool blocked.");
-        }
 
         let appSettings = { autoRotate: true, gesturesEnabled: true };
         let userSubscriptions = JSON.parse(localStorage.getItem('umatte_subs') || '[]');
@@ -310,59 +290,49 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        async function loadTrending() {
-            feedTitle.innerText = "Trending Feed (The Mine)";
-            videoGrid.innerHTML = '<div class="loader">Scanning server nodes...</div>';
-            try {
-                const data = await apiFetch('/trending?region=US');
-                renderVideoGrid(data, videoGrid);
-            } catch (err) {
-                // Graceful fallback to mock data so the app always works
-                renderVideoGrid(MOCK_VIDEOS, videoGrid);
+        function renderGrid(items, container, append = false) {
+            if (!append) container.innerHTML = '';
+            if (!items || items.length === 0) {
+                if (!append) container.innerHTML = '<div class="loader">No items found in this section.</div>';
+                return;
             }
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.innerHTML = `
+                    <div class="thumbnail-container">
+                        <img src="${item.thumbnail}" alt="${item.title}" loading="lazy">
+                    </div>
+                    <div class="video-info">
+                        <div class="video-title">${item.title}</div>
+                        <div class="video-channel">${item.uploader}</div>
+                    </div>
+                `;
+                card.addEventListener('click', () => playVideo(item));
+                container.appendChild(card);
+            });
         }
 
-        async function loadSubscriptions() {
+        function loadTrending() {
+            feedTitle.innerText = "Trending Feed (The Mine)";
+            renderGrid(CATALOG, videoGrid);
+        }
+
+        function loadSubscriptions() {
             feedTitle.innerText = "Your Subscriptions Feed";
             if (userSubscriptions.length === 0) {
                 videoGrid.innerHTML = '<div class="loader">No subscriptions saved yet. Open a video and hit Subscribe!</div>';
                 return;
             }
-            videoGrid.innerHTML = '<div class="loader">Pulling subscription streams...</div>';
-            try {
-                let allSubVideos = [];
-                for (let sub of userSubscriptions) {
-                    const data = await apiFetch(`/channel/${sub.id}`);
-                    if (data && data.relatedStreams) {
-                        allSubVideos.push(...data.relatedStreams);
-                    }
-                }
-                renderVideoGrid(allSubVideos, videoGrid);
-            } catch (err) {
-                renderVideoGrid(MOCK_VIDEOS.slice(0, 2), videoGrid);
-            }
+            const subVideos = CATALOG.filter(v => userSubscriptions.includes(v.uploader));
+            renderGrid(subVideos, videoGrid);
         }
 
-        async function loadDiscoverFeed() {
+        function loadDiscoverFeed() {
             feedTitle.innerText = "✨ Discover Goldmine (Collaborations & New Creators)";
-            if (userSubscriptions.length === 0) {
-                videoGrid.innerHTML = '<div class="loader">Subscribe to a few channels first to activate the discovery goldmine!</div>';
-                return;
-            }
-            videoGrid.innerHTML = '<div class="loader">Mining collaboration nodes...</div>';
-            try {
-                let discoveredVideos = [];
-                let shuffledSubs = [...userSubscriptions].sort(() => 0.5 - Math.random()).slice(0, 3);
-                for (let sub of shuffledSubs) {
-                    const chanData = await apiFetch(`/channel/${sub.id}`);
-                    if (chanData && chanData.relatedStreams) {
-                        discoveredVideos.push(...chanData.relatedStreams);
-                    }
-                }
-                renderVideoGrid(discoveredVideos, videoGrid);
-            } catch (err) {
-                renderVideoGrid(MOCK_VIDEOS.slice(2, 4), videoGrid);
-            }
+            // Shows creators the user is NOT subscribed to
+            const discoverVideos = CATALOG.filter(v => !userSubscriptions.includes(v.uploader));
+            renderGrid(discoverVideos, videoGrid);
         }
 
         function loadPlaylistsView() {
@@ -370,4 +340,20 @@
             videoGrid.innerHTML = '';
             const playlistNames = Object.keys(userPlaylists);
             if (playlistNames.length === 0 || playlistNames.every(p => userPlaylists[p].length === 0)) {
-                videoGrid.innerHTML = '<div 
+                videoGrid.innerHTML = '<div class="loader">No saved videos in playlists yet.</div>';
+                return;
+            }
+            playlistNames.forEach(name => {
+                const vids = userPlaylists[name];
+                if (vids.length > 0) {
+                    const header = document.createElement('h3');
+                    header.style.gridColumn = "1 / -1";
+                    header.style.marginTop = "10px";
+                    header.style.color = "var(--accent-color)";
+                    header.innerText = `📂 ${name} (${vids.length} videos)`;
+                    videoGrid.appendChild(header);
+                    renderGrid(vids, videoGrid, true);
+                }
+            });
+        }
+
